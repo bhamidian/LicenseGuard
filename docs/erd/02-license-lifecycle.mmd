@@ -1,0 +1,102 @@
+erDiagram
+    SUBSCRIPTION ||--o{ LICENSE : historical_licenses
+    SUBSCRIPTION o|--o| LICENSE : points_to_current
+    LICENSE ||--o{ LICENSE_ACTIVATION : has_devices
+    LICENSE ||--o{ LICENSE_STATUS_HISTORY : status_events
+    LICENSE ||--o{ LICENSE_FEATURE : effective_features
+    LICENSE ||--o{ LICENSE_LIMIT : effective_limits
+    LICENSE o|--o{ LICENSE_AUDIT_LOG : audit_events
+    FEATURE ||--o{ LICENSE_FEATURE : feature_definition
+    PLAN ||--o{ PLAN_FEATURE : plan_entitlements
+    FEATURE ||--o{ PLAN_FEATURE : plan_entitlements
+    SUBSCRIPTION ||--o{ SUBSCRIPTION_RENEWAL : renewal_history
+
+    SUBSCRIPTION {
+        guid Id PK
+        guid CustomerId FK
+        guid ProductId FK
+        guid PlanId FK
+        guid CurrentLicenseId FK
+        int Status
+        datetime StartDate
+        datetime EndDate
+    }
+    LICENSE {
+        guid Id PK
+        guid SubscriptionId FK
+        string Key UK
+        string Signature
+        int LicenseStatus
+        datetime StartDate
+        datetime ExpirationDate
+        boolean AutoRenewalEnabled
+        int AutoRenewalPlan
+    }
+    LICENSE_ACTIVATION {
+        guid Id PK
+        guid LicenseId FK
+        string MachineId
+        string InstanceId
+        string IpAddress
+        datetime ActivatedAt
+        datetime LastValidatedTime
+        datetime DeactivatedAt
+        int Status
+    }
+    LICENSE_STATUS_HISTORY {
+        guid Id PK
+        guid LicenseId FK
+        int Status
+        datetime ChangedAt
+        string Reason
+        guid ChangedByUserId
+    }
+    LICENSE_FEATURE {
+        guid Id PK
+        guid LicenseId FK
+        guid FeatureId FK
+        boolean IsEnabled
+    }
+    LICENSE_LIMIT {
+        guid Id PK
+        guid LicenseId FK
+        string Code
+        decimal Value
+        string Unit
+    }
+    LICENSE_AUDIT_LOG {
+        guid Id PK
+        guid LicenseId FK nullable
+        datetime CreatedAt
+        guid UserId nullable
+        string Action
+        string EntityType
+        string EntityId
+        boolean IsSuccess
+        string IpAddress
+        string CorrelationId
+    }
+    PLAN {
+        guid Id PK
+        guid ProductId FK
+        string Name
+        decimal Price
+    }
+    PLAN_FEATURE {
+        guid Id PK
+        guid PlanId FK
+        guid FeatureId FK
+    }
+    FEATURE {
+        guid Id PK
+        string Code UK
+        string Name
+    }
+    SUBSCRIPTION_RENEWAL {
+        guid Id PK
+        guid SubscriptionId FK
+        datetime RenewedAt
+        datetime PreviousExpirationDate
+        datetime NewExpirationDate
+        decimal Amount
+    }
