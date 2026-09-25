@@ -1,0 +1,25 @@
+# .NET build output
+**/bin/
+**/obj/
+
+# IDE and editor state
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+secrets.json
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Docker local overrides
+docker-compose.override.yml
+compose.override.yaml
