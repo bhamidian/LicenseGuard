@@ -1,1 +1,38 @@
-using LicenseGuard.Domain.Enums;\nusing LicenseGuard.Domain.Records;\nusing LicenseGuard.Domain.ValueObjects;\n\nnamespace LicenseGuard.Domain.Entities\n{\n    public class License : BaseEntity\n    {\n        public Guid SubscriptionId { get; private set; }\n        public Subscription Subscription { get; private set; } = null!;\n        public ICollection<LicenseActivation> Activations { get; private set; } = new List<LicenseActivation>();\n        public ICollection<LicenseStatusHistory> StatusHistory { get; private set; } = new List<LicenseStatusHistory>();\n        public ICollection<LicenseFeature> LicenseFeatures { get; private set; } = new List<LicenseFeature>();\n        public ICollection<LicenseLimit> Limits { get; private set; } = new List<LicenseLimit>();\n        public ICollection<AuditLog> AuditLogs { get; private set; } = new List<AuditLog>();\n        public LicenseStatusEnum LicenseStatus { get; private set; }\n        public DateTime ExpirationDate { get; private set; }\n        public DateTime StartDate { get; private set; }\n        public LicenseKey Key { get; private set; } = null!;\n        public LicenseSignature Signature { get; private set; } = null!;\n        public string Description { get; private set; } = string.Empty;\n        public Guid AdminId { get; private set; }\n        public AutoRenewal AutoRenewal { get; private set; } = new AutoRenewal(false);\n\n        public LicenseSigningData GetSigningData()\n        {\n            return new LicenseSigningData(\n                Key.Value,\n                Subscription.ProductId,\n                Subscription.PlanId,\n                StartDate,\n                ExpirationDate\n            );\n        }\n\n\n    }\n}\n
+using LicenseGuard.Domain.Enums;
+using LicenseGuard.Domain.Records;
+using LicenseGuard.Domain.ValueObjects;
+
+namespace LicenseGuard.Domain.Entities
+{
+    public class License : BaseEntity
+    {
+        public Guid SubscriptionId { get; private set; }
+        public Subscription Subscription { get; private set; } = null!;
+        public ICollection<LicenseActivation> Activations { get; private set; } = new List<LicenseActivation>();
+        public ICollection<LicenseStatusHistory> StatusHistory { get; private set; } = new List<LicenseStatusHistory>();
+        public ICollection<LicenseFeature> LicenseFeatures { get; private set; } = new List<LicenseFeature>();
+        public ICollection<LicenseLimit> Limits { get; private set; } = new List<LicenseLimit>();
+        public ICollection<AuditLog> AuditLogs { get; private set; } = new List<AuditLog>();
+        public LicenseStatusEnum LicenseStatus { get; private set; }
+        public DateTime ExpirationDate { get; private set; }
+        public DateTime StartDate { get; private set; }
+        public LicenseKey Key { get; private set; } = null!;
+        public LicenseSignature Signature { get; private set; } = null!;
+        public string Description { get; private set; } = string.Empty;
+        public Guid AdminId { get; private set; }
+        public AutoRenewal AutoRenewal { get; private set; } = new AutoRenewal(false);
+
+        public LicenseSigningData GetSigningData()
+        {
+            return new LicenseSigningData(
+                Key.Value,
+                Subscription.ProductId,
+                Subscription.PlanId,
+                StartDate,
+                ExpirationDate
+            );
+        }
+
+
+    }
+}
