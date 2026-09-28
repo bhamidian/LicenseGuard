@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using LicenseGuard.Domain.Exceptions;
 using LicenseGuard.Domain.Entities;
 
 namespace LicenseGuard.Domain.ValueObjects
@@ -23,12 +24,13 @@ namespace LicenseGuard.Domain.ValueObjects
         public static LicenseKey Create(string value)
         {
             if (string.IsNullOrWhiteSpace(value))
-                throw new ArgumentException("License key cannot be empty.");
+                throw new DomainValidationException("License key cannot be empty.");
 
-            if (value.Length != 64)
-                throw new ArgumentException("Invalid license key.");
+            var normalized = value.Trim().ToUpperInvariant();
+            if (normalized.Length != 64 || normalized.Any(character => !Uri.IsHexDigit(character)))
+                throw new DomainValidationException("License key must be exactly 64 hexadecimal characters.");
 
-            return new LicenseKey(value);
+            return new LicenseKey(normalized);
         }
 
         protected override IEnumerable<object> GetEqualityComponents()

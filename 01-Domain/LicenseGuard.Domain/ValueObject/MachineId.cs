@@ -1,4 +1,5 @@
 using LicenseGuard.Domain.Entities;
+using LicenseGuard.Domain.Exceptions;
 
 namespace LicenseGuard.Domain.ValueObjects
 {
@@ -15,18 +16,19 @@ namespace LicenseGuard.Domain.ValueObjects
 
         public static MachineId Create(string value)
         {
-            ArgumentNullException.ThrowIfNull(value);
+            if (value is null)
+                throw new DomainValidationException("Machine ID is required.");
 
             var normalizedValue = value.Trim();
 
             if (normalizedValue.Length == 0)
-                throw new ArgumentException("Machine ID cannot be empty.", nameof(value));
+                throw new DomainValidationException("Machine ID cannot be empty.");
 
             if (normalizedValue.Length > MaxLength)
-                throw new ArgumentException($"Machine ID cannot exceed {MaxLength} characters.", nameof(value));
+                throw new DomainValidationException($"Machine ID cannot exceed {MaxLength} characters.");
 
             if (normalizedValue.Any(char.IsControl))
-                throw new ArgumentException("Machine ID cannot contain control characters.", nameof(value));
+                throw new DomainValidationException("Machine ID cannot contain control characters.");
 
             return new MachineId(normalizedValue);
         }

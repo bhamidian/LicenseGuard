@@ -1,4 +1,5 @@
 using LicenseGuard.Domain.Entities;
+using LicenseGuard.Domain.Exceptions;
 
 namespace LicenseGuard.Domain.ValueObjects
 {
@@ -15,18 +16,19 @@ namespace LicenseGuard.Domain.ValueObjects
 
         public static InstanceId Create(string value)
         {
-            ArgumentNullException.ThrowIfNull(value);
+            if (value is null)
+                throw new DomainValidationException("Instance ID is required.");
 
             var normalizedValue = value.Trim();
 
             if (normalizedValue.Length == 0)
-                throw new ArgumentException("Instance ID cannot be empty.", nameof(value));
+                throw new DomainValidationException("Instance ID cannot be empty.");
 
             if (normalizedValue.Length > MaxLength)
-                throw new ArgumentException($"Instance ID cannot exceed {MaxLength} characters.", nameof(value));
+                throw new DomainValidationException($"Instance ID cannot exceed {MaxLength} characters.");
 
             if (normalizedValue.Any(char.IsControl))
-                throw new ArgumentException("Instance ID cannot contain control characters.", nameof(value));
+                throw new DomainValidationException("Instance ID cannot contain control characters.");
 
             return new InstanceId(normalizedValue);
         }
