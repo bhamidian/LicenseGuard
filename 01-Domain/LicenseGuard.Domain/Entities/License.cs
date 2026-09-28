@@ -1,6 +1,6 @@
-using LicenseGuard.Domain.Common.Entities;
-using LicenseGuard.Domain.LicenseAgg.Enums;
 
+
+using LicenseGuard.Domain.Enums;
 
 namespace LicenseGuard.Domain.Entities
 {
