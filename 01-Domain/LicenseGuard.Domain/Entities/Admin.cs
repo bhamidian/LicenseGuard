@@ -5,5 +5,7 @@ namespace LicenseGuard.Domain.Entities
         private Admin() { }
 
         public Admin(Guid appUserId) : base(appUserId) { }
+
+        public ICollection<License> IssuedLicenses { get; private set; } = new List<License>();
     }
 }

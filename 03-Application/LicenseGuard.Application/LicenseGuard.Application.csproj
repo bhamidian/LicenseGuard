@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <PackageReference Include="MediatR" Version="12.5.0" />
+    <ProjectReference Include="..\..\01-Domain\LicenseGuard.Domain\LicenseGuard.Domain.csproj" />
+    <ProjectReference Include="..\..\02-Infrastructure\LicenseGuard.Infrstructure.SecurityService\LicenseGuard.Infrstructure.SecurityService.csproj" />
+    <ProjectReference Include="..\..\02-Infrastructure\LicenseGuard.Infrastructure.JwtService\LicenseGuard.Infrastructure.JwtService.csproj" />
+  </ItemGroup>
+
+</Project>

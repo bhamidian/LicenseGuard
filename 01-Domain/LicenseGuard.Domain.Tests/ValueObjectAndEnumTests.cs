@@ -33,12 +33,10 @@ public sealed class ValueObjectAndEnumTests
     }
 
     [Fact]
-    public void LicenseKey_generates_random_256_bit_hex_and_validates_format()
+    public void LicenseKey_normalizes_and_validates_format()
     {
-        var first = LicenseKey.Generate();
-        var second = LicenseKey.Generate();
-        Assert.Equal(64, first.Value.Length);
-        Assert.NotEqual(first, second);
+        var first = LicenseKey.Create(new string('a', 64));
+        Assert.Equal(new string('A', 64), first.Value);
         Assert.Equal(first, LicenseKey.Create(first.Value.ToLowerInvariant()));
         Assert.Throws<DomainValidationException>(() => LicenseKey.Create("short"));
         Assert.Throws<DomainValidationException>(() => LicenseKey.Create(new string('z', 64)));
@@ -94,7 +92,8 @@ public sealed class ValueObjectAndEnumTests
     [Fact]
     public void Signing_record_has_value_equality()
     {
-        var data = new LicenseSigningData("key", Guid.NewGuid(), Guid.NewGuid(), DomainTestData.Start, DomainTestData.End);
+        var data = new LicenseSigningData("key", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DomainTestData.Start, DomainTestData.End,
+            "1", Array.Empty<FeatureSigningData>(), Array.Empty<LimitSigningData>());
         Assert.Equal(data, data with { });
     }
 }

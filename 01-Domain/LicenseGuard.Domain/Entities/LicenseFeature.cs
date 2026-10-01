@@ -14,6 +14,7 @@ namespace LicenseGuard.Domain.Entities
             LicenseId = licenseId;
             FeatureId = feature.Id;
             Feature = feature;
+            FeatureCodeSnapshot = feature.Code;
             IsEnabled = isEnabled;
         }
 
@@ -21,11 +22,12 @@ namespace LicenseGuard.Domain.Entities
         public License License { get; private set; } = null!;
         public Guid FeatureId { get; private set; }
         public Feature Feature { get; private set; } = null!;
+        public string FeatureCodeSnapshot { get; private set; } = null!;
         public bool IsEnabled { get; private set; } = true;
 
-        public void Enable() => IsEnabled = true;
-        public void Disable() => IsEnabled = false;
-        public void SetEnabled(bool enabled) => IsEnabled = enabled;
+        internal void Enable() => IsEnabled = true;
+        internal void Disable() => IsEnabled = false;
+        internal void SetEnabled(bool enabled) => IsEnabled = enabled;
 
         internal void AttachToLicense(License license)
         {

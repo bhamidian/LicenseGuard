@@ -47,16 +47,21 @@ public sealed class EntityBehaviorTests
     }
 
     [Fact]
-    public void AppUser_validates_role_and_associated_user()
+    public void AppUser_uses_identity_account_fields()
     {
-        Assert.Throws<DomainValidationException>(() => new AppUser(" ", Guid.NewGuid()));
-        Assert.Throws<DomainValidationException>(() => new AppUser("admin", Guid.Empty));
-        var role = new AppUser(" licensing admin ", Guid.NewGuid());
-        Assert.Equal("licensing admin", role.Name);
-        Assert.Equal("LICENSING ADMIN", role.NormalizedName);
-        Assert.NotEqual(Guid.Empty, role.Id);
-        role.RenameRole("operator");
-        Assert.Equal("OPERATOR", role.NormalizedName);
+        var account = new AppUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = "licensing-admin",
+            Email = "admin@example.test"
+        };
+
+        Assert.NotEqual(Guid.Empty, account.Id);
+        Assert.Equal("licensing-admin", account.UserName);
+        Assert.Equal("admin@example.test", account.Email);
+
+        account.UserName = "license-operator";
+        Assert.Equal("license-operator", account.UserName);
     }
 
     [Fact]
@@ -135,13 +140,13 @@ public sealed class EntityBehaviorTests
         Assert.Throws<DomainValidationException>(() => new Subscription(customer, product, plan, DomainTestData.End, DomainTestData.Start));
         var subscription = new Subscription(customer, product, plan, DomainTestData.Start, DomainTestData.End, metadata: " meta ");
         Assert.Equal("meta", subscription.MetaData);
-        var license = new License(subscription.Id, DomainTestData.AdminId, LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End);
+        var license = new License(subscription.Id, DomainTestData.AdminId, DomainTestData.Key(), LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End);
         subscription.AddLicense(license);
         Assert.Same(license, subscription.CurrentLicense);
         Assert.Equal(license.Id, subscription.CurrentLicenseId);
         subscription.ClearCurrentLicense();
         Assert.Null(subscription.CurrentLicenseId);
-        Assert.Throws<DomainRuleViolationException>(() => subscription.SetCurrentLicense(new License(Guid.NewGuid(), DomainTestData.AdminId, LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End)));
+        Assert.Throws<DomainRuleViolationException>(() => subscription.SetCurrentLicense(new License(Guid.NewGuid(), DomainTestData.AdminId, DomainTestData.Key(), LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End)));
         subscription.SetMetadata("updated");
         Assert.Equal("updated", subscription.MetaData);
     }
@@ -172,17 +177,17 @@ public sealed class EntityBehaviorTests
     }
 
     [Fact]
-    public void Subscription_renewal_updates_its_current_license_in_the_same_operation()
+    public void Subscription_renewal_updates_subscription_without_mutating_license_directly()
     {
         var (customer, product, plan, _) = DomainTestData.Catalog();
         var subscription = new Subscription(customer, product, plan, DomainTestData.Start, DomainTestData.End, SubscriptionStatusEnum.Active);
-        var license = new License(subscription.Id, DomainTestData.AdminId, LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End);
+        var license = new License(subscription.Id, DomainTestData.AdminId, DomainTestData.Key(), LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End);
         subscription.AddLicense(license);
         var newEnd = DomainTestData.End.AddMonths(6);
         var renewal = new SubscriptionRenewal(subscription.Id, 100m, DomainTestData.End, newEnd);
         subscription.Renew(renewal, Guid.NewGuid());
         Assert.Equal(newEnd, subscription.EndDate);
-        Assert.Equal(newEnd, license.ExpirationDate);
+        Assert.Equal(DomainTestData.End, license.ExpirationDate);
         Assert.Same(subscription, license.Subscription);
         Assert.Equal(LicenseStatusEnum.ACTIVE, license.LicenseStatus);
     }
@@ -196,7 +201,7 @@ public sealed class EntityBehaviorTests
         Assert.Single(license.StatusHistory);
         Assert.Equal(DomainTestData.AdminId, license.CreatedBy);
         Assert.Throws<DomainValidationException>(() => DomainTestData.License(0));
-        Assert.Throws<DomainValidationException>(() => new License(Guid.Empty, DomainTestData.AdminId, LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End));
+        Assert.Throws<DomainValidationException>(() => new License(Guid.Empty, DomainTestData.AdminId, DomainTestData.Key(), LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End));
     }
 
     [Fact]
@@ -272,7 +277,8 @@ public sealed class EntityBehaviorTests
         license.SetSignature(LicenseGuard.Domain.ValueObjects.LicenseSignature.Create("signature"));
         var (customer, product, plan, _) = DomainTestData.Catalog();
         var subscription = new Subscription(customer, product, plan, DomainTestData.Start, DomainTestData.End);
-        var linked = new License(subscription.Id, DomainTestData.AdminId, LicenseStatusEnum.ACTIVE, DomainTestData.Start, DomainTestData.End);
+        var linked = new License(subscription.Id, DomainTestData.AdminId, DomainTestData.Key(), LicenseStatusEnum.ACTIVE,
+            DomainTestData.Start, DomainTestData.End, customerId: customer.Id, productId: product.Id, planId: plan.Id);
         subscription.AddLicense(linked);
         Assert.Equal(product.Id, linked.GetSigningData().ProductId);
     }

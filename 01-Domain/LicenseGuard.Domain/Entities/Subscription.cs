@@ -107,8 +107,6 @@ public class Subscription : BaseEntity
             throw new DomainRuleViolationException("Renewal previous expiration does not match the subscription.");
         if (Status == SubscriptionStatusEnum.Canceled)
             throw new DomainRuleViolationException("A canceled subscription cannot be renewed.");
-        if (CurrentLicense is not null)
-            CurrentLicense.Renew(renewal.NewExpirationDate, renewal.Amount, renewedByUserId, renewal.RenewedAt);
         Renewals.Add(renewal);
         EndDate = renewal.NewExpirationDate;
         Status = SubscriptionStatusEnum.Active;

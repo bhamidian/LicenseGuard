@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using LicenseGuard.Domain.Exceptions;
 using LicenseGuard.Domain.Entities;
 
@@ -11,14 +10,6 @@ namespace LicenseGuard.Domain.ValueObjects
         private LicenseKey(string value)
         {
             Value = value;
-        }
-
-        public static LicenseKey Generate()
-        {
-            var bytes = RandomNumberGenerator.GetBytes(32);
-            var value = Convert.ToHexString(bytes);
-
-            return new LicenseKey(value);
         }
 
         public static LicenseKey Create(string value)

@@ -7,6 +7,7 @@ namespace LicenseGuard.Domain.Tests;
 internal static class DomainTestData
 {
     public static readonly Guid AdminId = Guid.NewGuid();
+    public static LicenseKey Key() => LicenseKey.Create(new string('A', 64));
     public static DateTime Start => new(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
     public static DateTime End => new(2027, 9, 1, 0, 0, 0, DateTimeKind.Utc);
 
@@ -30,7 +31,8 @@ internal static class DomainTestData
     public static License License(int maxActivations = 1, LicenseStatusEnum status = LicenseStatusEnum.ACTIVE)
     {
         var subscription = Subscription();
-        var license = new License(subscription.Id, AdminId, status, Start, End, maxActivations);
+        var license = new License(subscription.Id, AdminId, Key(), status, Start, End, maxActivations,
+            subscription.CustomerId, subscription.ProductId, subscription.PlanId);
         subscription.AddLicense(license);
         return license;
     }

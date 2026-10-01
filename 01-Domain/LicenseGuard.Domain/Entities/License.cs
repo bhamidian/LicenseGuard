@@ -11,21 +11,29 @@ public class License : BaseEntity
 
     private License() { }
 
-    public License(Guid subscriptionId, Guid adminId, LicenseStatusEnum licenseStatus,
-        DateTime startDate, DateTime endDate, int maxActivations = 1)
+    internal License(Guid subscriptionId, Guid adminId, LicenseKey key, LicenseStatusEnum licenseStatus,
+        DateTime startDate, DateTime endDate, int maxActivations = 1, Guid customerId = default,
+        Guid productId = default, Guid planId = default, string policyVersion = "1")
     {
         if (subscriptionId == Guid.Empty) throw new DomainValidationException("Subscription ID cannot be empty.");
         if (adminId == Guid.Empty) throw new DomainValidationException("Admin ID cannot be empty.");
+        ArgumentNullException.ThrowIfNull(key);
         if (!Enum.IsDefined(licenseStatus) || licenseStatus is LicenseStatusEnum.REVOKED or LicenseStatusEnum.EXPIRED or LicenseStatusEnum.RESUMED)
             throw new DomainValidationException("A new license must start in Pending, Active or Suspended state.");
         if (maxActivations < 1) throw new DomainValidationException("At least one activation must be allowed.");
         StartDate = EnsureUtc(startDate);
         ExpirationDate = EnsureUtc(endDate);
+        IssuedExpirationDate = ExpirationDate;
         if (ExpirationDate <= StartDate) throw new DomainValidationException("Expiration must be later than start date.");
 
         SubscriptionId = subscriptionId;
+        CustomerId = customerId;
+        ProductId = productId;
+        PlanId = planId;
+        PolicyVersion = DomainText.Required(policyVersion, 50, nameof(policyVersion));
+        AdminId = adminId;
         LicenseStatus = licenseStatus;
-        Key = LicenseKey.Generate();
+        Key = key;
         AutoRenewal = new AutoRenewal(false);
         var activationLimit = new LicenseLimit(Id, MaxActivationsLimitCode, maxActivations, "activations");
         activationLimit.AttachToLicense(this);
@@ -38,11 +46,18 @@ public class License : BaseEntity
 
     public DateTime StartDate { get; private set; }
     public Guid SubscriptionId { get; private set; }
+    public Guid CustomerId { get; private set; }
+    public Guid ProductId { get; private set; }
+    public Guid PlanId { get; private set; }
+    public string PolicyVersion { get; private set; } = "1";
+    public Guid AdminId { get; private set; }
     public DateTime ExpirationDate { get; private set; }
+    public DateTime IssuedExpirationDate { get; private set; }
     public LicenseKey Key { get; private set; } = null!;
     public LicenseStatusEnum LicenseStatus { get; private set; }
     public string Description { get; private set; } = string.Empty;
     public Subscription Subscription { get; private set; } = null!;
+    public Admin Admin { get; private set; } = null!;
     public LicenseSignature Signature { get; private set; } = null!;
     public AutoRenewal AutoRenewal { get; private set; } = new(false);
     public ICollection<AuditLog> AuditLogs { get; private set; } = new List<AuditLog>();
@@ -53,9 +68,12 @@ public class License : BaseEntity
 
     public LicenseSigningData GetSigningData()
     {
-        if (Key is null || Subscription is null)
-            throw new DomainRuleViolationException("License key and subscription are required before signing data can be created.");
-        return new LicenseSigningData(Key.Value, Subscription.ProductId, Subscription.PlanId, StartDate, ExpirationDate);
+        if (Key is null || CustomerId == Guid.Empty || ProductId == Guid.Empty || PlanId == Guid.Empty)
+            throw new DomainRuleViolationException("License snapshot is incomplete and cannot be signed.");
+        return new LicenseSigningData(Key.Value, CustomerId, ProductId, PlanId, StartDate, IssuedExpirationDate,
+            PolicyVersion,
+            LicenseFeatures.OrderBy(x => x.FeatureId).Select(x => new FeatureSigningData(x.FeatureId, x.FeatureCodeSnapshot, x.IsEnabled)).ToArray(),
+            Limits.OrderBy(x => x.Code, StringComparer.Ordinal).Select(x => new LimitSigningData(x.Code, x.Value, x.Unit)).ToArray());
     }
 
     public void SetSignature(LicenseSignature signature)
@@ -80,6 +98,7 @@ public class License : BaseEntity
 
     public LicenseLimit SetLimit(string code, decimal value, string? unit = null)
     {
+        EnsureSnapshotNotSigned();
         var normalizedCode = DomainText.Required(code, 100, nameof(code)).ToLowerInvariant();
         if (normalizedCode == MaxActivationsLimitCode && (value < 1 || value != decimal.Truncate(value)))
             throw new DomainValidationException("Maximum activations must be a positive whole number.");
@@ -97,6 +116,7 @@ public class License : BaseEntity
 
     public LicenseFeature GrantFeature(Feature feature, bool enabled = true)
     {
+        EnsureSnapshotNotSigned();
         ArgumentNullException.ThrowIfNull(feature);
         var existing = LicenseFeatures.SingleOrDefault(link => link.FeatureId == feature.Id);
         if (existing is not null)
@@ -122,14 +142,23 @@ public class License : BaseEntity
         ArgumentNullException.ThrowIfNull(machineId);
         ArgumentNullException.ThrowIfNull(instanceId);
         var instant = EnsureUtc(at ?? DateTime.UtcNow);
+        var activation = new LicenseActivation(Id, machineId, instanceId, ipAddress, instant);
+        return Activate(activation, instant);
+    }
+
+    public LicenseActivation Activate(LicenseActivation activation, DateTime? at = null)
+    {
+        ArgumentNullException.ThrowIfNull(activation);
+        if (activation.LicenseId != Id)
+            throw new DomainRuleViolationException("Activation belongs to another license.");
+        var instant = EnsureUtc(at ?? DateTime.UtcNow);
         EnsureUsableAt(instant);
         var max = (int)(Limits.SingleOrDefault(limit => limit.Code == MaxActivationsLimitCode)?.Value ?? 1);
         if (Activations.Count(activation => activation.Status == ActivationStatusEnum.Active) >= max)
             throw new DomainRuleViolationException("The license activation limit has been reached.");
-        if (Activations.Any(activation => activation.Status == ActivationStatusEnum.Active &&
-            (activation.MachineId.Equals(machineId) || activation.InstanceId.Equals(instanceId))))
+        if (Activations.Any(existing => existing.Status == ActivationStatusEnum.Active &&
+            (existing.MachineId.Equals(activation.MachineId) || existing.InstanceId.Equals(activation.InstanceId))))
             throw new DomainRuleViolationException("This machine or instance is already activated.");
-        var activation = new LicenseActivation(Id, machineId, instanceId, ipAddress, instant);
         activation.AttachToLicense(this);
         Activations.Add(activation);
         return activation;
@@ -164,6 +193,7 @@ public class License : BaseEntity
         if (newExpirationUtc <= ExpirationDate)
             throw new DomainValidationException("Renewal expiration must extend the current expiration.");
         ExpirationDate = newExpirationUtc;
+        IssuedExpirationDate = newExpirationUtc;
         if (LicenseStatus == LicenseStatusEnum.EXPIRED)
         {
             LicenseStatus = LicenseStatusEnum.ACTIVE;
@@ -191,6 +221,21 @@ public class License : BaseEntity
         if (subscription.Id != SubscriptionId)
             throw new DomainRuleViolationException("License belongs to another subscription.");
         Subscription = subscription;
+    }
+
+    internal void AddSnapshotFeature(Feature feature)
+    {
+        ArgumentNullException.ThrowIfNull(feature);
+        if (LicenseFeatures.Any(x => x.FeatureId == feature.Id)) return;
+        var link = new LicenseFeature(Id, feature);
+        link.AttachToLicense(this);
+        LicenseFeatures.Add(link);
+    }
+
+    private void EnsureSnapshotNotSigned()
+    {
+        if (Signature is not null)
+            throw new DomainRuleViolationException("Signed license entitlements are immutable.");
     }
 
     private void EnsureUsableAt(DateTime at)

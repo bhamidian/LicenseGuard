@@ -7,7 +7,7 @@ namespace LicenseGuard.Domain.Entities
     {
         private AuditLog() { }
 
-        public AuditLog(string action, string entityType, string? entityId, bool isSuccess, Guid? userId = null,
+        internal AuditLog(string action, string entityType, string? entityId, bool isSuccess, Guid? userId = null,
             Guid? licenseId = null, Guid? correlationId = null, string? ipAddress = null,
             string? userAgent = null, string? oldValues = null, string? newValues = null, string? metadata = null,
             DateTime? createdAt = null)
