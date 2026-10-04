@@ -96,6 +96,94 @@ public class License : BaseEntity
         Touch();
     }
 
+    public void UpdateAutoRenewal(bool? enabled, AutoRenwalPlanEnum? plan)
+    {
+        if (enabled is null && plan is null) return;
+
+        var updated = new AutoRenewal(false);
+        var effectivePlan = plan ?? AutoRenewal.Plan;
+        if (effectivePlan is { } renewalPlan)
+            updated.SetPlan(renewalPlan);
+
+        var effectiveEnabled = enabled ?? AutoRenewal.IsEnabled;
+        if (effectiveEnabled)
+            updated.Enable();
+        else
+            updated.Disable();
+
+        SetAutoRenewal(updated);
+    }
+
+    public void UpdateSignedEntitlements(IReadOnlyCollection<Feature>? enabledFeatures,
+        int? maxActivations, IReadOnlyCollection<LicenseLimitUpdateRecord>? limits)
+    {
+        if (LicenseStatus is LicenseStatusEnum.REVOKED or LicenseStatusEnum.EXPIRED)
+            throw new DomainRuleViolationException("A revoked or expired license cannot be edited.");
+
+        if (maxActivations is { } activationLimit)
+        {
+            if (activationLimit < 1)
+                throw new DomainValidationException("Maximum activations must be a positive whole number.");
+            if (activationLimit < Activations.Count(activation => activation.Status == ActivationStatusEnum.Active))
+                throw new DomainRuleViolationException("Maximum activations cannot be lower than the current active activation count.");
+            var currentLimit = Limits.SingleOrDefault(limit => limit.Code == MaxActivationsLimitCode);
+            if (currentLimit is null)
+            {
+                var newLimit = new LicenseLimit(Id, MaxActivationsLimitCode, activationLimit, "activations");
+                newLimit.AttachToLicense(this);
+                Limits.Add(newLimit);
+            }
+            else
+            {
+                currentLimit.SetValue(activationLimit, "activations");
+            }
+        }
+
+        if (limits is not null)
+        {
+            foreach (var update in limits)
+            {
+                var code = DomainText.Required(update.Code, 100, nameof(update.Code)).ToLowerInvariant();
+                if (code == MaxActivationsLimitCode)
+                    throw new DomainValidationException("Update max_activations using the dedicated field.");
+                var currentLimit = Limits.SingleOrDefault(limit => limit.Code == code);
+                if (currentLimit is null)
+                {
+                    var newLimit = new LicenseLimit(Id, code, update.Value, update.Unit);
+                    newLimit.AttachToLicense(this);
+                    Limits.Add(newLimit);
+                }
+                else
+                {
+                    currentLimit.SetValue(update.Value, update.Unit);
+                }
+            }
+        }
+
+        if (enabledFeatures is not null)
+        {
+            var selectedIds = enabledFeatures.Select(feature => feature.Id).ToHashSet();
+            if (selectedIds.Count != enabledFeatures.Count)
+                throw new DomainValidationException("Feature IDs must be unique.");
+            if (enabledFeatures.Any(feature => !feature.ProductFeatures.Any(link =>
+                    link.ProductId == ProductId && link.IsActive && !link.IsDeleted)))
+                throw new DomainRuleViolationException("A selected feature is not available for this product.");
+
+            foreach (var existing in LicenseFeatures)
+                existing.SetEnabled(selectedIds.Contains(existing.FeatureId));
+
+            foreach (var feature in enabledFeatures.Where(feature =>
+                         LicenseFeatures.All(existing => existing.FeatureId != feature.Id)))
+            {
+                var grant = new LicenseFeature(Id, feature);
+                grant.AttachToLicense(this);
+                LicenseFeatures.Add(grant);
+            }
+        }
+
+        Touch();
+    }
+
     public LicenseLimit SetLimit(string code, decimal value, string? unit = null)
     {
         EnsureSnapshotNotSigned();
@@ -154,9 +242,9 @@ public class License : BaseEntity
         var instant = EnsureUtc(at ?? DateTime.UtcNow);
         EnsureUsableAt(instant);
         var max = (int)(Limits.SingleOrDefault(limit => limit.Code == MaxActivationsLimitCode)?.Value ?? 1);
-        if (Activations.Count(activation => activation.Status == ActivationStatusEnum.Active) >= max)
+        if (Activations.Count(existing => existing.Id != activation.Id && existing.Status == ActivationStatusEnum.Active) >= max)
             throw new DomainRuleViolationException("The license activation limit has been reached.");
-        if (Activations.Any(existing => existing.Status == ActivationStatusEnum.Active &&
+        if (Activations.Any(existing => existing.Id != activation.Id && existing.Status == ActivationStatusEnum.Active &&
             (existing.MachineId.Equals(activation.MachineId) || existing.InstanceId.Equals(activation.InstanceId))))
             throw new DomainRuleViolationException("This machine or instance is already activated.");
         activation.AttachToLicense(this);
@@ -167,11 +255,23 @@ public class License : BaseEntity
     public void Suspend(Guid adminId, string? reason = null) => ChangeStatus(LicenseStatusEnum.SUSPENDED, adminId, reason);
     public void Revoke(Guid adminId, string? reason = null) => ChangeStatus(LicenseStatusEnum.REVOKED, adminId, reason);
 
+    public void Approve(Guid adminId, string? reason = null)
+    {
+        if (LicenseStatus != LicenseStatusEnum.PENDING)
+            throw new DomainRuleViolationException("Only a pending license can be approved.");
+        var now = DateTime.UtcNow;
+        EnsureNotExpired(now);
+        EnsureSubscriptionActive(now);
+        ChangeStatus(LicenseStatusEnum.ACTIVE, adminId, reason ?? "License approved.");
+    }
+
     public void Resume(Guid adminId, string? reason = null)
     {
         if (LicenseStatus != LicenseStatusEnum.SUSPENDED)
             throw new DomainRuleViolationException("Only a suspended license can be resumed.");
-        EnsureNotExpired(DateTime.UtcNow);
+        var now = DateTime.UtcNow;
+        EnsureNotExpired(now);
+        EnsureSubscriptionActive(now);
         ChangeStatus(LicenseStatusEnum.ACTIVE, adminId, reason);
     }
 
@@ -250,6 +350,12 @@ public class License : BaseEntity
     {
         if (EnsureUtc(at) >= ExpirationDate || LicenseStatus == LicenseStatusEnum.EXPIRED)
             throw new DomainRuleViolationException("License has expired.");
+    }
+
+    private void EnsureSubscriptionActive(DateTime at)
+    {
+        if (Subscription is null || !Subscription.IsActiveAt(at))
+            throw new DomainRuleViolationException("The subscription must be active to enable this license.");
     }
 
     private void ChangeStatus(LicenseStatusEnum newStatus, Guid? adminId, string? reason, DateTime? at = null)

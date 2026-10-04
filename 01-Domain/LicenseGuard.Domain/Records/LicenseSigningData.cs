@@ -11,7 +11,4 @@ namespace LicenseGuard.Domain.Records
         IReadOnlyList<FeatureSigningData> Features,
         IReadOnlyList<LimitSigningData> Limits
     );
-
-    public sealed record FeatureSigningData(Guid FeatureId, string Code, bool IsEnabled);
-    public sealed record LimitSigningData(string Code, decimal Value, string? Unit);
 }

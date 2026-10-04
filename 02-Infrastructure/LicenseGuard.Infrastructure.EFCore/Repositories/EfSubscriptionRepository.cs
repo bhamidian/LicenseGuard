@@ -26,4 +26,20 @@ public sealed class EfSubscriptionRepository(ApplicationDbContext dbContext) : I
             .Include(subscription => subscription.CurrentLicense)
                 .ThenInclude(license => license!.Limits)
             .SingleOrDefaultAsync(subscription => subscription.Id == subscriptionId, cancellationToken);
+
+    public async Task<Subscription?> GetDetailsAsync(Guid subscriptionId, Guid? customerId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.Subscriptions.AsNoTracking()
+            .Where(subscription => subscription.Id == subscriptionId);
+        if (customerId is { } ownerId)
+            query = query.Where(subscription => subscription.CustomerId == ownerId);
+
+        return await query
+            .Include(subscription => subscription.Product)
+            .Include(subscription => subscription.Plan)
+            .Include(subscription => subscription.Renewals)
+            .AsSplitQuery()
+            .SingleOrDefaultAsync(cancellationToken);
+    }
 }

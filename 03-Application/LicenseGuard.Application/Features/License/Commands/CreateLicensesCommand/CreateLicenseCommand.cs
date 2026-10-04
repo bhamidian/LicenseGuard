@@ -3,7 +3,8 @@ using MediatR;
 
 namespace LicenseGuard.Application.Features.License.Commands.CreateLicensesCommand;
 
-public sealed record CreateLicenseCommand(Guid SubscriptionId, Guid IssuedByAdminId, int MaxActivations,
+public sealed record CreateLicenseCommand(Guid SubscriptionId, Guid IssuedByAdminId, Guid IssuedByUserId,
+    int MaxActivations,
     IReadOnlyCollection<Guid>? FeatureIds = null)
     : IRequest<ResultDto<CreateLicenseResponse>>;
 

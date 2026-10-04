@@ -5,5 +5,6 @@ namespace LicenseGuard.Domain.Repositories;
 
 public interface IAuditLogRepository
 {
+    AuditLog Create(CreateAuditLogRecord record);
     AuditLog Create(CreateAuditLogRecord record, License license);
 }

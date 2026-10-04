@@ -8,6 +8,7 @@ public sealed class CreateLicenseCommandValidator : AbstractValidator<CreateLice
     {
         RuleFor(command => command.SubscriptionId).NotEmpty();
         RuleFor(command => command.IssuedByAdminId).NotEmpty();
+        RuleFor(command => command.IssuedByUserId).NotEmpty();
         RuleFor(command => command.MaxActivations).GreaterThan(0);
     }
 }

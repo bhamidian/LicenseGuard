@@ -58,6 +58,8 @@ public static class DependencyInjection
     private static IServiceCollection RegisterRepositories(IServiceCollection services)
     {
         services.AddScoped<ISubscriptionRepository, EfSubscriptionRepository>();
+        services.AddScoped<IAdminRepository, EfAdminRepository>();
+        services.AddScoped<IProductCatalogRepository, EfProductCatalogRepository>();
         services.AddScoped<IAppUserRepository, EfAppUserRepository>();
         services.AddScoped<ICustomerRepository, EfCustomerRepository>();
         services.AddScoped<ISubscriptionRenewalRepository, EfSubscriptionRenewalRepository>();

@@ -54,7 +54,8 @@ public sealed class CreateLicenseCommandHandler(
         var signature = signer.Sign(license.GetSigningData());
         license.SetSignature(signature);
 
-        var auditRecord = await auditLogService.ValidateLicenseIssuedAsync(command.IssuedByAdminId, license.Id, cancellationToken);
+        var auditRecord = await auditLogService.ValidateLicenseIssuedAsync(command.IssuedByAdminId,
+            command.IssuedByUserId, license.Id, cancellationToken);
         if (!auditRecord.IsSuccess || auditRecord.Data is null)
             return ResultDto<CreateLicenseResponse>.Fail(auditRecord.Message, auditRecord.Errors, auditRecord.FailureKind ?? ResultFailureKind.Validation);
         auditLogs.Create(auditRecord.Data, license);

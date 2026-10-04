@@ -1,5 +1,6 @@
 using FluentValidation;
 using LicenseGuard.Application.Contracts;
+using LicenseGuard.Application.Features.License.Services;
 using LicenseGuard.Domain.Dtos;
 using LicenseGuard.Domain.Enums;
 using LicenseGuard.Domain.Records;
@@ -16,7 +17,9 @@ public sealed class ActivateLicenseCommandHandler(
     ILicenseRepository licenses,
     ILicenseActivationRepository activations,
     IUnitOfWork unitOfWork,
-    ILicenseSigner signer)
+    ILicenseSigner signer,
+    IAuditLogRepository auditLogs,
+    IAuditLogService auditLogService)
     : IRequestHandler<ActivateLicenseCommand, ResultDto<ActivateLicenseResponse>>
 {
     public async Task<ResultDto<ActivateLicenseResponse>> Handle(
@@ -53,6 +56,13 @@ public sealed class ActivateLicenseCommandHandler(
         var activation = activations.Create(new CreateLicenseActivationRecord(
             license.Id, machineId, instanceId, command.IpAddress, now));
         license.Activate(activation, now);
+
+        var auditRecord = await auditLogService.ValidateLicenseActivatedAsync(
+            license.Id, activation.Id, command.IpAddress, cancellationToken);
+        if (!auditRecord.IsSuccess || auditRecord.Data is null)
+            return ResultDto<ActivateLicenseResponse>.Fail(auditRecord.Message, auditRecord.Errors,
+                auditRecord.FailureKind ?? ResultFailureKind.Validation);
+        auditLogs.Create(auditRecord.Data, license);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
